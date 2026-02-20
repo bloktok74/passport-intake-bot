@@ -49,6 +49,11 @@
       box-shadow: 0 4px 12px rgba(39,174,96,0.3);
     }
     .btn-lookup:hover:not(:disabled) { background: #219a52; }
+    .btn-update {
+      background: #F39C12; color: #fff;
+      box-shadow: 0 4px 12px rgba(243,156,18,0.3);
+    }
+    .btn-update:hover:not(:disabled) { background: #d68910; }
     .btn-end {
       background: #E74C3C; color: #fff;
       box-shadow: 0 4px 12px rgba(231,76,60,0.3);
@@ -85,6 +90,7 @@
     <p class="subtitle">Tap a button, allow mic access, then speak</p>
 
     <button class="btn btn-intake" id="btnIntake" disabled>Loading SDK...</button>
+    <button class="btn btn-update" id="btnUpdate" disabled>Loading SDK...</button>
     <button class="btn btn-lookup" id="btnLookup" disabled>Loading SDK...</button>
     <button class="btn btn-end" id="btnEnd">End Call</button>
 
@@ -96,12 +102,14 @@
     // ---- Configuration ----
     var BACKEND_URL = "https://maruti21.app.n8n.cloud/webhook/voice-portal-call";
     var INTAKE_AGENT  = "agent_93dccaf2327182f00950b1149c";
+    var UPDATE_AGENT  = "agent_2570bdd2bb1ff6e241cc3f23ca";
     var LOOKUP_AGENT  = "agent_1c19de160eb9131dc71b7cb3d3";
 
     // ---- DOM refs ----
     var client   = null;
     var statusEl = document.getElementById("status");
     var btnIntake = document.getElementById("btnIntake");
+    var btnUpdate = document.getElementById("btnUpdate");
     var btnLookup = document.getElementById("btnLookup");
     var btnEnd    = document.getElementById("btnEnd");
     var micNote   = document.getElementById("micNote");
@@ -113,6 +121,7 @@
 
     function setButtons(calling) {
       btnIntake.style.display = calling ? "none" : "block";
+      btnUpdate.style.display = calling ? "none" : "block";
       btnLookup.style.display = calling ? "none" : "block";
       btnEnd.style.display    = calling ? "block" : "none";
     }
@@ -148,6 +157,8 @@
         // Enable buttons
         btnIntake.disabled = false;
         btnIntake.textContent = "Add New Customer";
+        btnUpdate.disabled = false;
+        btnUpdate.textContent = "Update Customer Record";
         btnLookup.disabled = false;
         btnLookup.textContent = "Check Customer Status";
         statusEl.style.display = "none";
@@ -232,6 +243,7 @@
 
     // ---- Wire buttons ----
     btnIntake.addEventListener("click", function() { startCall(INTAKE_AGENT); });
+    btnUpdate.addEventListener("click", function() { startCall(UPDATE_AGENT); });
     btnLookup.addEventListener("click", function() { startCall(LOOKUP_AGENT); });
     btnEnd.addEventListener("click", endCall);
 
