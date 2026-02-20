@@ -144,7 +144,7 @@
         await loadScript("https://unpkg.com/eventemitter3@5.0.1/dist/eventemitter3.umd.min.js");
 
         setStatus("loading", "Loading voice SDK (2/3)...");
-        await loadScript("https://unpkg.com/livekit-client@2.9.8/dist/livekit-client.umd.js");
+        await loadScript("https://unpkg.com/livekit-client@2.17.2/dist/livekit-client.umd.js");
 
         // Bridge global names: UMD libraries expose PascalCase,
         // but retell SDK expects camelCase globals
@@ -173,19 +173,9 @@
     // ---- Start Call ----
     async function startCall(agentId) {
       try {
-        setStatus("connecting", "Requesting mic access...");
-        setButtons(true);
-
-        // Request mic permission
-        try {
-          await navigator.mediaDevices.getUserMedia({ audio: true });
-          micNote.textContent = "Mic access granted";
-        } catch (e) {
-          throw new Error("Microphone access denied. Please allow mic access and try again.");
-        }
-
-        // Get access token from n8n backend
         setStatus("connecting", "Connecting to agent...");
+        setButtons(true);
+        micNote.textContent = "Requesting mic access...";
         var resp = await fetch(BACKEND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -198,9 +188,12 @@
         client = new window.retellClientJsSdk.RetellWebClient();
 
         client.on("call_started", function() {
+          console.log("call_started event fired");
           setStatus("active", '<span class="pulse"></span>Call active — speak now');
+          micNote.textContent = "Mic active";
         });
         client.on("call_ended", function() {
+          console.log("call_ended event fired");
           setStatus("ended", "Call ended");
           setButtons(false);
           client = null;
@@ -211,6 +204,9 @@
         client.on("agent_stop_talking", function() {
           setStatus("active", '<span class="pulse"></span>Listening...');
         });
+        client.on("update", function(update) {
+          console.log("update:", update);
+        });
         client.on("error", function(err) {
           console.error("Retell error:", err);
           setStatus("error", "Error: " + (err.message || JSON.stringify(err)));
@@ -218,12 +214,9 @@
           client = null;
         });
 
-        // Start the call
+        // Start the call — let SDK handle mic access and audio config
         await client.startCall({
-          accessToken: data.access_token,
-          sampleRate: 24000,
-          captureDeviceId: "default",
-          emitRawAudioSamples: false
+          accessToken: data.access_token
         });
 
       } catch (err) {
