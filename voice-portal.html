@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passport Pros - Voice Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .portal {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      padding: 40px 32px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    }
+    h1 { color: #1a1a2e; font-size: 22px; margin-bottom: 8px; }
+    .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 18px 24px;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-intake {
+      background: #4A90D9; color: #fff;
+      box-shadow: 0 4px 12px rgba(74,144,217,0.3);
+    }
+    .btn-intake:hover:not(:disabled) { background: #3a7bc8; }
+    .btn-lookup {
+      background: #27AE60; color: #fff;
+      box-shadow: 0 4px 12px rgba(39,174,96,0.3);
+    }
+    .btn-lookup:hover:not(:disabled) { background: #219a52; }
+    .btn-end {
+      background: #E74C3C; color: #fff;
+      box-shadow: 0 4px 12px rgba(231,76,60,0.3);
+      display: none;
+    }
+    .btn-end:hover:not(:disabled) { background: #c0392b; }
+    .status {
+      margin-top: 20px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+    }
+    .status.connecting { display: block; background: #FFF3CD; color: #856404; }
+    .status.active { display: block; background: #D4EDDA; color: #155724; }
+    .status.ended { display: block; background: #f0f2f5; color: #666; }
+    .status.error { display: block; background: #F8D7DA; color: #721C24; }
+    .status.loading { display: block; background: #E8F4FD; color: #0c5460; }
+    .pulse {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; background: #27AE60; margin-right: 8px;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+    .mic-note { color: #999; font-size: 12px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="portal">
+    <h1>Passport Pros Voice Portal</h1>
+    <p class="subtitle">Tap a button, allow mic access, then speak</p>
+
+    <button class="btn btn-intake" id="btnIntake" disabled>Loading SDK...</button>
+    <button class="btn btn-lookup" id="btnLookup" disabled>Loading SDK...</button>
+    <button class="btn btn-end" id="btnEnd">End Call</button>
+
+    <div class="status loading" id="status">Loading voice SDK...</div>
+    <p class="mic-note" id="micNote">Requires microphone access</p>
+  </div>
+
+  <script>
+    // ---- Configuration ----
+    var BACKEND_URL = "https://maruti21.app.n8n.cloud/webhook/voice-portal-call";
+    var INTAKE_AGENT  = "agent_93dccaf2327182f00950b1149c";
+    var LOOKUP_AGENT  = "agent_1c19de160eb9131dc71b7cb3d3";
+
+    // ---- DOM refs ----
+    var client   = null;
+    var statusEl = document.getElementById("status");
+    var btnIntake = document.getElementById("btnIntake");
+    var btnLookup = document.getElementById("btnLookup");
+    var btnEnd    = document.getElementById("btnEnd");
+    var micNote   = document.getElementById("micNote");
+
+    function setStatus(cls, msg) {
+      statusEl.className = "status " + cls;
+      statusEl.innerHTML = msg;
+    }
+
+    function setButtons(calling) {
+      btnIntake.style.display = calling ? "none" : "block";
+      btnLookup.style.display = calling ? "none" : "block";
+      btnEnd.style.display    = calling ? "block" : "none";
+    }
+
+    // ---- Script loader ----
+    function loadScript(url) {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement("script");
+        s.src = url;
+        s.onload = resolve;
+        s.onerror = function() { reject(new Error("Failed to load: " + url)); };
+        document.body.appendChild(s);
+      });
+    }
+
+    // ---- SDK Init ----
+    async function initSDK() {
+      try {
+        setStatus("loading", "Loading voice SDK (1/3)...");
+        await loadScript("https://unpkg.com/eventemitter3@5.0.1/dist/eventemitter3.umd.min.js");
+
+        setStatus("loading", "Loading voice SDK (2/3)...");
+        await loadScript("https://unpkg.com/livekit-client@2.9.8/dist/livekit-client.umd.js");
+
+        // Bridge global names: UMD libraries expose PascalCase,
+        // but retell SDK expects camelCase globals
+        window.eventemitter3 = window.EventEmitter3;
+        window.livekitClient = window.LivekitClient;
+
+        setStatus("loading", "Loading voice SDK (3/3)...");
+        await loadScript("https://unpkg.com/retell-client-js-sdk@2.0.7/dist/index.umd.js");
+
+        // Enable buttons
+        btnIntake.disabled = false;
+        btnIntake.textContent = "Add New Customer";
+        btnLookup.disabled = false;
+        btnLookup.textContent = "Check Customer Status";
+        statusEl.style.display = "none";
+        statusEl.className = "status";
+        console.log("Retell SDK loaded successfully");
+      } catch (err) {
+        console.error("SDK load error:", err);
+        setStatus("error", "Failed to load voice SDK: " + err.message);
+      }
+    }
+
+    // ---- Start Call ----
+    async function startCall(agentId) {
+      try {
+        setStatus("connecting", "Requesting mic access...");
+        setButtons(true);
+
+        // Request mic permission
+        try {
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+          micNote.textContent = "Mic access granted";
+        } catch (e) {
+          throw new Error("Microphone access denied. Please allow mic access and try again.");
+        }
+
+        // Get access token from n8n backend
+        setStatus("connecting", "Connecting to agent...");
+        var resp = await fetch(BACKEND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agent_id: agentId })
+        });
+        var data = await resp.json();
+        if (!data.access_token) throw new Error("No access token received");
+
+        // Create Retell client and wire events
+        client = new window.retellClientJsSdk.RetellWebClient();
+
+        client.on("call_started", function() {
+          setStatus("active", '<span class="pulse"></span>Call active — speak now');
+        });
+        client.on("call_ended", function() {
+          setStatus("ended", "Call ended");
+          setButtons(false);
+          client = null;
+        });
+        client.on("agent_start_talking", function() {
+          setStatus("active", '<span class="pulse"></span>Agent speaking...');
+        });
+        client.on("agent_stop_talking", function() {
+          setStatus("active", '<span class="pulse"></span>Listening...');
+        });
+        client.on("error", function(err) {
+          console.error("Retell error:", err);
+          setStatus("error", "Error: " + (err.message || JSON.stringify(err)));
+          setButtons(false);
+          client = null;
+        });
+
+        // Start the call
+        await client.startCall({
+          accessToken: data.access_token,
+          sampleRate: 24000,
+          captureDeviceId: "default",
+          emitRawAudioSamples: false
+        });
+
+      } catch (err) {
+        console.error("startCall error:", err);
+        setStatus("error", "Failed: " + err.message);
+        setButtons(false);
+      }
+    }
+
+    // ---- End Call ----
+    function endCall() {
+      if (client) client.stopCall();
+      setStatus("ended", "Call ended");
+      setButtons(false);
+      client = null;
+    }
+
+    // ---- Wire buttons ----
+    btnIntake.addEventListener("click", function() { startCall(INTAKE_AGENT); });
+    btnLookup.addEventListener("click", function() { startCall(LOOKUP_AGENT); });
+    btnEnd.addEventListener("click", endCall);
+
+    // ---- Boot ----
+    initSDK();
+  </script>
+</body>
+</html>
