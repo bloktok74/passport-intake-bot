@@ -231,6 +231,14 @@
   </div>
 
   <script>
+    // ---- Global error handlers for diagnostics ----
+    window.onerror = function(msg, src, line, col, err) {
+      console.error("GLOBAL ERROR:", msg, "at", src, line + ":" + col, err);
+    };
+    window.addEventListener("unhandledrejection", function(e) {
+      console.error("UNHANDLED REJECTION:", e.reason);
+    });
+
     // ---- Configuration ----
     var BACKEND_URL = "https://delphivisa.app.n8n.cloud/webhook/voice-portal-call";
     var UPLOAD_URL  = "https://delphivisa.app.n8n.cloud/webhook/upload-document";
@@ -274,7 +282,7 @@
       return new Promise(function(resolve, reject) {
         var s = document.createElement("script");
         s.src = url;
-        s.onload = resolve;
+        s.onload = function() { console.log("Loaded:", url.split("/").pop()); resolve(); };
         s.onerror = function() { reject(new Error("Failed to load: " + url)); };
         document.body.appendChild(s);
       });
@@ -295,6 +303,14 @@
         setStatus("loading", "Loading voice SDK (3/3)...");
         await loadScript("https://unpkg.com/retell-client-js-sdk@2.0.7/dist/index.umd.js");
 
+        // Verify SDK globals
+        console.log("SDK Check - EventEmitter3:", typeof window.EventEmitter3);
+        console.log("SDK Check - LivekitClient:", typeof window.LivekitClient);
+        console.log("SDK Check - eventemitter3:", typeof window.eventemitter3);
+        console.log("SDK Check - livekitClient:", typeof window.livekitClient);
+        console.log("SDK Check - retellClientJsSdk:", typeof window.retellClientJsSdk);
+        console.log("SDK Check - RetellWebClient:", typeof (window.retellClientJsSdk && window.retellClientJsSdk.RetellWebClient));
+
         btnIntake.disabled = false;
         btnIntake.textContent = "Add New Customer";
         btnUpdate.disabled = false;
@@ -303,7 +319,7 @@
         btnLookup.textContent = "Check Customer Status";
         statusEl.style.display = "none";
         statusEl.className = "status";
-        console.log("Retell SDK loaded successfully");
+        console.log("Retell SDK loaded successfully - all checks passed");
       } catch (err) {
         console.error("SDK load error:", err);
         setStatus("error", "Failed to load voice SDK: " + err.message);
@@ -313,53 +329,73 @@
     // ---- Start Call ----
     async function startCall(agentId) {
       try {
+        console.log("=== START CALL ===");
+        console.log("Agent ID:", agentId);
         setStatus("connecting", "Connecting to agent...");
         setButtons(true);
         micNote.textContent = "Requesting mic access...";
+
+        console.log("Step 1: Fetching access token from webhook...");
         var resp = await fetch(BACKEND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ agent_id: agentId })
         });
+        console.log("Step 2: Webhook response status:", resp.status);
         var data = await resp.json();
+        console.log("Step 3: Response call_id:", data.call_id, "agent:", data.agent_id);
+        console.log("Step 3: access_token present:", !!data.access_token, "length:", data.access_token ? data.access_token.length : 0);
         if (!data.access_token) throw new Error("No access token received");
 
+        console.log("Step 4: Creating RetellWebClient...");
         client = new window.retellClientJsSdk.RetellWebClient();
+        console.log("Step 4: RetellWebClient created OK");
 
         client.on("call_started", function() {
-          console.log("call_started event fired");
+          console.log("EVENT: call_started");
           setStatus("active", '<span class="pulse"></span>Call active \u2014 speak now');
           micNote.textContent = "Mic active";
         });
         client.on("call_ended", function() {
-          console.log("call_ended event fired");
+          console.log("EVENT: call_ended");
           setStatus("ended", "Call ended");
           setButtons(false);
           client = null;
         });
         client.on("agent_start_talking", function() {
+          console.log("EVENT: agent_start_talking");
           setStatus("active", '<span class="pulse"></span>Agent speaking...');
         });
         client.on("agent_stop_talking", function() {
+          console.log("EVENT: agent_stop_talking");
           setStatus("active", '<span class="pulse"></span>Listening...');
         });
         client.on("update", function(update) {
-          console.log("update:", update);
+          console.log("EVENT: update", update);
         });
         client.on("error", function(err) {
-          console.error("Retell error:", err);
+          console.error("EVENT: error", err);
           setStatus("error", "Error: " + (err.message || JSON.stringify(err)));
           setButtons(false);
           client = null;
         });
 
-        console.log("Starting call with token:", data.access_token.slice(0, 20) + "...");
-        setStatus("connecting", "Connecting... allow mic access if prompted");
+        console.log("Step 5: Calling startCall with token:", data.access_token.slice(0, 30) + "...");
+        setStatus("connecting", "Connecting to voice server... allow mic access if prompted");
+
+        // Add timeout detection
+        var callTimeout = setTimeout(function() {
+          console.warn("WARNING: startCall has been pending for 15s - may be blocked on mic access");
+          setStatus("connecting", "Waiting for mic access... please allow microphone in your browser");
+        }, 15000);
+
         await client.startCall({ accessToken: data.access_token });
-        console.log("startCall resolved successfully");
+        clearTimeout(callTimeout);
+        console.log("Step 6: startCall RESOLVED successfully - call should be active");
 
       } catch (err) {
-        console.error("startCall error:", err);
+        console.error("startCall FAILED:", err);
+        console.error("Error details:", err.name, err.message, err.stack);
         setStatus("error", "Failed: " + err.message);
         setButtons(false);
       }
