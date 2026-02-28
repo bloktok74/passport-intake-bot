@@ -303,6 +303,7 @@
         btnLookup.textContent = "Check Customer Status";
         statusEl.style.display = "none";
         statusEl.className = "status";
+        console.log("Retell SDK loaded successfully");
       } catch (err) {
         console.error("SDK load error:", err);
         setStatus("error", "Failed to load voice SDK: " + err.message);
@@ -326,10 +327,12 @@
         client = new window.retellClientJsSdk.RetellWebClient();
 
         client.on("call_started", function() {
+          console.log("call_started event fired");
           setStatus("active", '<span class="pulse"></span>Call active \u2014 speak now');
           micNote.textContent = "Mic active";
         });
         client.on("call_ended", function() {
+          console.log("call_ended event fired");
           setStatus("ended", "Call ended");
           setButtons(false);
           client = null;
@@ -340,6 +343,9 @@
         client.on("agent_stop_talking", function() {
           setStatus("active", '<span class="pulse"></span>Listening...');
         });
+        client.on("update", function(update) {
+          console.log("update:", update);
+        });
         client.on("error", function(err) {
           console.error("Retell error:", err);
           setStatus("error", "Error: " + (err.message || JSON.stringify(err)));
@@ -347,7 +353,10 @@
           client = null;
         });
 
+        console.log("Starting call with token:", data.access_token.slice(0, 20) + "...");
+        setStatus("connecting", "Connecting... allow mic access if prompted");
         await client.startCall({ accessToken: data.access_token });
+        console.log("startCall resolved successfully");
 
       } catch (err) {
         console.error("startCall error:", err);
