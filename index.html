@@ -19,7 +19,7 @@
       border-radius: 16px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.1);
       padding: 40px 32px;
-      max-width: 400px;
+      max-width: 440px;
       width: 90%;
       text-align: center;
     }
@@ -72,6 +72,7 @@
     .status.ended { display: block; background: #f0f2f5; color: #666; }
     .status.error { display: block; background: #F8D7DA; color: #721C24; }
     .status.loading { display: block; background: #E8F4FD; color: #0c5460; }
+    .status.success { display: block; background: #D4EDDA; color: #155724; }
     .pulse {
       display: inline-block; width: 10px; height: 10px;
       border-radius: 50%; background: #27AE60; margin-right: 8px;
@@ -82,6 +83,108 @@
       50% { opacity: 0.5; transform: scale(1.3); }
     }
     .mic-note { color: #999; font-size: 12px; margin-top: 16px; }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid #e0e0e0;
+      margin: 28px 0 24px;
+    }
+
+    /* Upload Section */
+    .upload-section h2 {
+      color: #1a1a2e;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    .upload-section .upload-subtitle {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      text-align: left;
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .form-group input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input[type="text"]:focus {
+      border-color: #4A90D9;
+    }
+    .name-row {
+      display: flex;
+      gap: 10px;
+    }
+    .name-row .form-group { flex: 1; }
+
+    .file-drop {
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .file-drop:hover, .file-drop.dragover {
+      border-color: #4A90D9;
+      background: #f0f6ff;
+    }
+    .file-drop input[type="file"] {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .file-list {
+      text-align: left;
+      margin-bottom: 16px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: #f9f9f9;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .file-item .remove {
+      color: #E74C3C;
+      cursor: pointer;
+      font-weight: bold;
+      padding: 2px 6px;
+    }
+    .btn-upload {
+      background: #8E44AD; color: #fff;
+      box-shadow: 0 4px 12px rgba(142,68,173,0.3);
+    }
+    .btn-upload:hover:not(:disabled) { background: #7d3c98; }
+    .upload-status {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -96,14 +199,44 @@
 
     <div class="status loading" id="status">Loading voice SDK...</div>
     <p class="mic-note" id="micNote">Requires microphone access</p>
+
+    <hr class="divider">
+
+    <div class="upload-section">
+      <h2>Upload Documents</h2>
+      <p class="upload-subtitle">Attach photocopies of passports, IDs, or other documents</p>
+
+      <div class="name-row">
+        <div class="form-group">
+          <label for="uploadFirstName">First Name</label>
+          <input type="text" id="uploadFirstName" placeholder="First name">
+        </div>
+        <div class="form-group">
+          <label for="uploadLastName">Last Name</label>
+          <input type="text" id="uploadLastName" placeholder="Last name">
+        </div>
+      </div>
+
+      <div class="file-drop" id="fileDrop">
+        <p>Drag & drop files here or tap to browse</p>
+        <p style="font-size:12px; margin-top:4px; color:#aaa">PDF, JPG, PNG accepted</p>
+        <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx">
+      </div>
+
+      <div class="file-list" id="fileList"></div>
+
+      <button class="btn btn-upload" id="btnUpload" disabled>Upload Documents</button>
+      <div class="upload-status" id="uploadStatus"></div>
+    </div>
   </div>
 
   <script>
     // ---- Configuration ----
-    var BACKEND_URL = "https://maruti21.app.n8n.cloud/webhook/voice-portal-call";
-    var INTAKE_AGENT  = "agent_93dccaf2327182f00950b1149c";
-    var UPDATE_AGENT  = "agent_2570bdd2bb1ff6e241cc3f23ca";
-    var LOOKUP_AGENT  = "agent_1c19de160eb9131dc71b7cb3d3";
+    var BACKEND_URL = "https://delphivisa.app.n8n.cloud/webhook/voice-portal-call";
+    var UPLOAD_URL  = "https://delphivisa.app.n8n.cloud/webhook/upload-document";
+    var INTAKE_AGENT  = "agent_4eabd7bf929a77fecec4d512be";
+    var UPDATE_AGENT  = "agent_76a564315d61b76386e329f6a3";
+    var LOOKUP_AGENT  = "agent_1e600e03a923dc0897b08c9696";
 
     // ---- DOM refs ----
     var client   = null;
@@ -113,6 +246,16 @@
     var btnLookup = document.getElementById("btnLookup");
     var btnEnd    = document.getElementById("btnEnd");
     var micNote   = document.getElementById("micNote");
+
+    // Upload refs
+    var fileInput = document.getElementById("fileInput");
+    var fileDrop  = document.getElementById("fileDrop");
+    var fileListEl = document.getElementById("fileList");
+    var btnUpload = document.getElementById("btnUpload");
+    var uploadStatus = document.getElementById("uploadStatus");
+    var uploadFirstName = document.getElementById("uploadFirstName");
+    var uploadLastName = document.getElementById("uploadLastName");
+    var selectedFiles = [];
 
     function setStatus(cls, msg) {
       statusEl.className = "status " + cls;
@@ -146,15 +289,12 @@
         setStatus("loading", "Loading voice SDK (2/3)...");
         await loadScript("https://unpkg.com/livekit-client@2.17.2/dist/livekit-client.umd.js");
 
-        // Bridge global names: UMD libraries expose PascalCase,
-        // but retell SDK expects camelCase globals
         window.eventemitter3 = window.EventEmitter3;
         window.livekitClient = window.LivekitClient;
 
         setStatus("loading", "Loading voice SDK (3/3)...");
         await loadScript("https://unpkg.com/retell-client-js-sdk@2.0.7/dist/index.umd.js");
 
-        // Enable buttons
         btnIntake.disabled = false;
         btnIntake.textContent = "Add New Customer";
         btnUpdate.disabled = false;
@@ -163,7 +303,6 @@
         btnLookup.textContent = "Check Customer Status";
         statusEl.style.display = "none";
         statusEl.className = "status";
-        console.log("Retell SDK loaded successfully");
       } catch (err) {
         console.error("SDK load error:", err);
         setStatus("error", "Failed to load voice SDK: " + err.message);
@@ -184,16 +323,13 @@
         var data = await resp.json();
         if (!data.access_token) throw new Error("No access token received");
 
-        // Create Retell client and wire events
         client = new window.retellClientJsSdk.RetellWebClient();
 
         client.on("call_started", function() {
-          console.log("call_started event fired");
-          setStatus("active", '<span class="pulse"></span>Call active — speak now');
+          setStatus("active", '<span class="pulse"></span>Call active \u2014 speak now');
           micNote.textContent = "Mic active";
         });
         client.on("call_ended", function() {
-          console.log("call_ended event fired");
           setStatus("ended", "Call ended");
           setButtons(false);
           client = null;
@@ -204,9 +340,6 @@
         client.on("agent_stop_talking", function() {
           setStatus("active", '<span class="pulse"></span>Listening...');
         });
-        client.on("update", function(update) {
-          console.log("update:", update);
-        });
         client.on("error", function(err) {
           console.error("Retell error:", err);
           setStatus("error", "Error: " + (err.message || JSON.stringify(err)));
@@ -214,10 +347,7 @@
           client = null;
         });
 
-        // Start the call — let SDK handle mic access and audio config
-        await client.startCall({
-          accessToken: data.access_token
-        });
+        await client.startCall({ accessToken: data.access_token });
 
       } catch (err) {
         console.error("startCall error:", err);
@@ -226,7 +356,6 @@
       }
     }
 
-    // ---- End Call ----
     function endCall() {
       if (client) client.stopCall();
       setStatus("ended", "Call ended");
@@ -234,11 +363,125 @@
       client = null;
     }
 
-    // ---- Wire buttons ----
+    // ---- Wire voice buttons ----
     btnIntake.addEventListener("click", function() { startCall(INTAKE_AGENT); });
     btnUpdate.addEventListener("click", function() { startCall(UPDATE_AGENT); });
     btnLookup.addEventListener("click", function() { startCall(LOOKUP_AGENT); });
     btnEnd.addEventListener("click", endCall);
+
+    // ---- File Upload Logic ----
+    function renderFileList() {
+      fileListEl.innerHTML = "";
+      selectedFiles.forEach(function(f, i) {
+        var div = document.createElement("div");
+        div.className = "file-item";
+        var sizeKB = (f.size / 1024).toFixed(0);
+        div.innerHTML = '<span>' + f.name + ' (' + sizeKB + ' KB)</span><span class="remove" data-idx="' + i + '">\u2715</span>';
+        fileListEl.appendChild(div);
+      });
+      btnUpload.disabled = selectedFiles.length === 0;
+    }
+
+    fileInput.addEventListener("change", function() {
+      for (var i = 0; i < fileInput.files.length; i++) {
+        selectedFiles.push(fileInput.files[i]);
+      }
+      fileInput.value = "";
+      renderFileList();
+    });
+
+    fileListEl.addEventListener("click", function(e) {
+      if (e.target.classList.contains("remove")) {
+        var idx = parseInt(e.target.getAttribute("data-idx"));
+        selectedFiles.splice(idx, 1);
+        renderFileList();
+      }
+    });
+
+    fileDrop.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      fileDrop.classList.add("dragover");
+    });
+    fileDrop.addEventListener("dragleave", function() {
+      fileDrop.classList.remove("dragover");
+    });
+    fileDrop.addEventListener("drop", function(e) {
+      e.preventDefault();
+      fileDrop.classList.remove("dragover");
+      for (var i = 0; i < e.dataTransfer.files.length; i++) {
+        selectedFiles.push(e.dataTransfer.files[i]);
+      }
+      renderFileList();
+    });
+
+    btnUpload.addEventListener("click", async function() {
+      var firstName = uploadFirstName.value.trim();
+      var lastName = uploadLastName.value.trim();
+      if (!firstName || !lastName) {
+        uploadStatus.className = "upload-status error";
+        uploadStatus.style.display = "block";
+        uploadStatus.textContent = "Please enter the customer's first and last name.";
+        return;
+      }
+      if (selectedFiles.length === 0) return;
+
+      btnUpload.disabled = true;
+      btnUpload.textContent = "Uploading...";
+      uploadStatus.className = "upload-status loading";
+      uploadStatus.style.display = "block";
+      uploadStatus.textContent = "Converting files...";
+
+      try {
+        // Convert files to base64 for JSON upload
+        var filePromises = selectedFiles.map(function(f) {
+          return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function() {
+              resolve({
+                filename: f.name,
+                content: reader.result.split(",")[1], // base64 data
+                type: f.type
+              });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(f);
+          });
+        });
+
+        var fileData = await Promise.all(filePromises);
+        uploadStatus.textContent = "Uploading " + fileData.length + " file(s)...";
+
+        var resp = await fetch(UPLOAD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            files: fileData
+          })
+        });
+
+        var result = await resp.json();
+        if (result.success) {
+          uploadStatus.className = "upload-status success";
+          uploadStatus.textContent = result.message;
+          selectedFiles = [];
+          renderFileList();
+          uploadFirstName.value = "";
+          uploadLastName.value = "";
+        } else {
+          uploadStatus.className = "upload-status error";
+          uploadStatus.textContent = result.message || "Upload failed. Please try again.";
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        uploadStatus.className = "upload-status error";
+        uploadStatus.textContent = "Upload failed: " + err.message;
+      }
+
+      btnUpload.disabled = false;
+      btnUpload.textContent = "Upload Documents";
+    });
 
     // ---- Boot ----
     initSDK();
